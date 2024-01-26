@@ -1,4 +1,5 @@
 import pygame
+import random
 
 pygame.init()
 
@@ -18,12 +19,12 @@ ground_surface = pygame.transform.scale(pygame.image.load('graphics/ground.png')
 player_surface = pygame.image.load('graphics/Player/player_walk_1.png').convert_alpha()
 player_rect = player_surface.get_rect(midbottom=(600, 750))
 
+# Carregando a imagem do jogador atacando
 espada_surf = pygame.image.load('graphics/Player/espada.png').convert_alpha()
 espada_rect = espada_surf.get_rect(midleft=player_rect.topright)
 
 snail_surf = pygame.image.load('graphics/snail/snail1.png').convert_alpha()
-snail_rect = snail_surf.get_rect(midbottom=(1600, 750))
-snail_x_pos = 600
+snail_rect_list = []  # Lista para armazenar retângulos das Snails
 
 # Variáveis de rolagem para o céu e o chão
 background_scroll = 0
@@ -42,8 +43,11 @@ attack_duration = 20  # Número de frames que o ataque é exibido
 cooldown_duration = 0  # Tempo de cooldown entre os ataques (60 frames por segundo * 5 segundos)
 is_attacking = False  # Flag para indicar se o jogador está atacando
 
-# Configuração da fonte para exibir o tempo de recarga
+# Configuração da fonte para exibir o tempo de jogo
 font = pygame.font.Font(None, 36)
+
+# Variáveis do score (tempo em segundos)
+score = 0
 
 while True:
     for event in pygame.event.get():
@@ -54,11 +58,13 @@ while True:
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 3:
             # Aplica o dash apenas se a tecla A ou D estiver pressionada
             if pygame.key.get_pressed()[pygame.K_a]:
-                player_rect.left -= dash_speed
-                espada_rect.left -= dash_speed
+                if player_rect.left > 400:
+                    player_rect.left -= dash_speed
+                    espada_rect.left -= dash_speed
             if pygame.key.get_pressed()[pygame.K_d]:
-                player_rect.left += dash_speed
-                espada_rect.left += dash_speed
+                if player_rect.right < game_display[0] - 400:
+                    player_rect.left += dash_speed
+                    espada_rect.left += dash_speed
         # Verifica se o botão esquerdo do mouse foi pressionado
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1 and attack_cooldown == 0:
             if cooldown_duration == 0:
@@ -113,7 +119,7 @@ while True:
                 screen.blit(espada_surf, espada_rect)
 
         if cooldown_duration == 0 and attack_cooldown > 0:
-            cooldown_duration = 150
+            cooldown_duration = 50
 
         if attack_cooldown == 0:
             is_attacking = False
@@ -124,17 +130,28 @@ while True:
             cooldown_text = font.render(f"Tempo de Recarga: {int(cooldown_duration/60)+1}", True, 'black')
             screen.blit(cooldown_text, (10, 10))
 
-        # Verifica a colisão entre a espada e a Snail durante a animação de ataque
-        if is_attacking and espada_rect.colliderect(snail_rect):
-            is_attacking = False  # Desativa a animação de ataque
-            snail_rect.x = 1600  # Reposiciona a Snail fora da tela
+        # Gera Snails aleatoriamente e as move
+        if random.randint(0, 100) < 1:  # Probabilidade de 1% de gerar uma Snail
+            new_snail_rect = snail_surf.get_rect(midbottom=(1600, 750))
+            snail_rect_list.append(new_snail_rect)
 
-        screen.blit(snail_surf, snail_rect)
-        snail_rect.x -= 10
-        if snail_rect.right <= 0:
-            snail_rect.left = 1600
+        for snail_rect in snail_rect_list:
+            screen.blit(snail_surf, snail_rect)
+            snail_rect.x -= 10
+            if snail_rect.right <= 0:
+                snail_rect_list.remove(snail_rect)
 
-        if snail_rect.colliderect(player_rect):
+            # Verifica a colisão entre a espada e a Snail durante a animação de ataque
+            if is_attacking and espada_rect.colliderect(snail_rect):
+                is_attacking = False  # Desativa a animação de ataque
+                snail_rect.x = 1600  # Reposiciona a Snail fora da tela
+
+        score += 1  # Incrementa o score
+        # Exibe o score (tempo em segundos) na tela
+        score_text = font.render(f"Tempo: {int(score/60)+1} s", True, 'black')
+        screen.blit(score_text, (game_display[0] // 2 - score_text.get_width() // 2, 10))
+
+        if any(snail_rect.colliderect(player_rect) for snail_rect in snail_rect_list):
             game_active = False
 
         # Atualizando a posição do chão e do cenário para a repetição
@@ -142,10 +159,12 @@ while True:
         background_scroll %= sky_width
 
     else:
-        screen.fill('black')
         if keys[pygame.K_SPACE] or keys[pygame.K_a] or keys[pygame.K_d]:
             game_active = True
-            snail_rect.right = 1600
+            snail_rect_list.clear()  # Limpa a lista de Snails
+            player_rect.midbottom = (600, 750)  # Reposiciona o jogador
+            espada_rect.midleft = player_rect.topright  # Reposiciona a espada
+            score = 0  # Reinicia o score
 
     # Atualizando a tela e controlando os frames por segundo
     pygame.display.update()
